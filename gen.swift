@@ -24,7 +24,7 @@ let defMpvArgs: Set = [
     "--osd-level=0",
     "--no-border",
     "--input-file=" + mpvpipe,
-    "--vo=opengl-cb",
+    "--vo=libmpv",
     "--dither-depth=8",
     "--fbo-format=rgba16f",
     "--scaler-lut-size=8",
@@ -159,8 +159,10 @@ let scalerDownEssentialOpts: [String] = [
 
 // special image doubling filters with default options
 let specialDoublerScalers: [[String:Any]] = [
-    [ "id" : "ravu-r4",                              "scaler" : "ravu-r4-rgb.hook",         "args" : [ ] ],
-    [ "id" : "nnedi3-nns32-win8x6",                  "scaler" : "nnedi3-nns32-win8x6.hook", "args" : [ "--vf=format=yuv444p" ] ]
+    [ "id" : "ravu-r4",             "scaler" : "ravu-r4-rgb.hook",         "args" : [ ] ],
+    [ "id" : "nnedi3-nns32-win8x6", "scaler" : "nnedi3-nns32-win8x6.hook", "args" : [ "--vf=format=yuv444p" ] ],
+    [ "id" : "fsrcnnx-8-0-4-1",     "scaler" : "FSRCNNX_x2_8-0-4-1.glsl",  "args" : [ "--vf=format=yuv444p" ] ],
+    [ "id" : "fsrcnnx-16-0-4-1",    "scaler" : "FSRCNNX_x2_16-0-4-1.glsl", "args" : [ "--vf=format=yuv444p" ] ]
 ]
 
 // various test options for image doubling filters
@@ -250,7 +252,7 @@ func exec(cmd: String, args: [String]) -> Process {
 func execMPV(cmd: String) {
     let f = FileHandle(forWritingAtPath: mpvpipe)!
     let bytes: [UInt8] = Array((cmd + "\n").utf8)
-    f.write(Data(bytes: bytes))
+    f.write(Data(bytes))
     f.closeFile()
 }
 
@@ -258,12 +260,12 @@ func execMPV(cmd: String) {
 func makeScreen(algo: String, id: String, folder: String, specialArgs: [String],
                 switchName: Bool = false, window: String = "", hooks: [String] = [ ])
 {
-    let testDirectoryURL = URL(fileURLWithPath: folder, relativeTo: scriptDirectoryURL)
-    let testDirectory    = testDirectoryURL.path
-    let testFile         = URL(fileURLWithPath: "original.png", relativeTo: testDirectoryURL).path
-    let algoName         = algo.replacingOccurrences(of: "_", with: "-")
-    let screenshotName   = switchName ? id + "_" + algoName : algoName + "_" + id
-    let screenshotPath   = URL(fileURLWithPath: screenshotName + ".png", relativeTo: testDirectoryURL).path
+    let testDirectoryURL: URL  = URL(fileURLWithPath: folder, relativeTo: scriptDirectoryURL)
+    let testDirectory: String  = testDirectoryURL.path
+    let testFile: String       = URL(fileURLWithPath: "original.png", relativeTo: testDirectoryURL).path
+    let algoName: String       = algo.replacingOccurrences(of: "_", with: "-")
+    let screenshotName: String = switchName ? id + "_" + algoName : algoName + "_" + id
+    let screenshotPath: String = URL(fileURLWithPath: screenshotName + ".png", relativeTo: testDirectoryURL).path
 
     let screenTemplate: [String] = [
         "--screenshot-template=" + screenshotName,
@@ -281,7 +283,8 @@ func makeScreen(algo: String, id: String, folder: String, specialArgs: [String],
         ]
     let hooksArgs: [String] = hooks.isEmpty ? [] : hooks.map({ "--glsl-shaders-append=" + $0 })
 
-    let args: [String] = scaleArgs + windowArgs + specialArgs + hooksArgs + screenTemplate + [testFile]
+    var args: [String] = scaleArgs + windowArgs + specialArgs
+        args           = args + hooksArgs + screenTemplate + [testFile]
 
 
     if fileManager.fileExists(atPath: screenshotPath) {
@@ -322,7 +325,7 @@ func scaleTest(files: [[String:Any]], options: [[String:Any]], filter: [[String:
 
 // scaler window test for up- and down scaling
 func windowTest(files: [[String:Any]], args: [String]) {
-        for file in files {
+    for file in files {
         let name = (file["name"] as! String) + "-window"
         let args = (file["args"] as! [String]) + args
         for algo in scalers.subtracting(scalerBlacklistWindow) {
@@ -342,7 +345,7 @@ print("-------------------------------------")
 mkfifo(mpvpipe, 0o666)
 
 // generate upscaler tests
-scaleTest(files: testFilesUp, options: scalerUpOpts, filter: specialUpFilters)
+//scaleTest(files: testFilesUp, options: scalerUpOpts, filter: specialUpFilters)
 
 // generate image doubler tests
 for file in testFilesUp {
@@ -359,16 +362,16 @@ for file in testFilesUp {
 }
 
 // generate scale window upscaling tests
-windowTest(files: testFilesUp, args: scalerUpEssentialOpts)
+//windowTest(files: testFilesUp, args: scalerUpEssentialOpts)
 
 // generate downscalers tests
-scaleTest(files: testFilesDown, options: scalerDownOpts, filter: specialDownFilters)
+//scaleTest(files: testFilesDown, options: scalerDownOpts, filter: specialDownFilters)
 
 // generate scale window downscaling tests
-windowTest(files: testFilesDown, args: scalerDownEssentialOpts)
+//windowTest(files: testFilesDown, args: scalerDownEssentialOpts)
 
 // generate my scaling settings tests
-for file in testFilesUp {
+/*for file in testFilesUp {
     let name = file["name"] as! String
     for opt in richter {
         let algo  = opt["scale"] as! String
@@ -378,7 +381,7 @@ for file in testFilesUp {
         let hooks = hook == nil ? [] : [ URL(fileURLWithPath: "hooks/" + hook!, relativeTo: scriptDirectoryURL).path ]
         makeScreen(algo: algo, id: id, folder: name, specialArgs: args, switchName: true, hooks: hooks)
     }
-}
+}*/
 
 // play a sound when done
 let sound = NSSound(named: "Glass")!
